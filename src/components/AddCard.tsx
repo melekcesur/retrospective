@@ -10,29 +10,32 @@ interface Props {
   onRefresh: () => void;
 }
 
-export default function AddCard({
-  sessionId,
-  columnId,
-  userId,
-  onRefresh,
-}: Props) {
+export default function AddCard({ sessionId, columnId, userId, onRefresh }: Props) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!text.trim()) return;
+    if (!text.trim() || !userId) return;
     setSaving(true);
+    setError('');
     try {
-      await fetch(`/api/sessions/${sessionId}/cards`, {
+      const res = await fetch(`/api/sessions/${sessionId}/cards`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ columnId, text, authorId: userId }),
+        body: JSON.stringify({ columnId, text: text.trim(), authorId: userId }),
       });
+      if (!res.ok) {
+        setError('Kart eklenemedi.');
+        return;
+      }
       setText('');
       setOpen(false);
       onRefresh();
+    } catch {
+      setError('Bağlantı hatası.');
     } finally {
       setSaving(false);
     }
@@ -41,8 +44,9 @@ export default function AddCard({
   if (!open) {
     return (
       <button
+        disabled={!userId}
         onClick={() => setOpen(true)}
-        className="flex w-full items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-400 transition hover:border-slate-400 hover:text-slate-600"
+        className="flex w-full items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-400 transition hover:border-slate-400 hover:text-slate-600 disabled:opacity-40"
       >
         <span className="text-base leading-none">+</span> Kart ekle
       </button>
@@ -63,12 +67,10 @@ export default function AddCard({
             e.preventDefault();
             handleSubmit(e as unknown as React.FormEvent);
           }
-          if (e.key === 'Escape') {
-            setOpen(false);
-            setText('');
-          }
+          if (e.key === 'Escape') { setOpen(false); setText(''); }
         }}
       />
+      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
       <div className="mt-1.5 flex gap-1.5">
         <button
           type="submit"
@@ -79,7 +81,7 @@ export default function AddCard({
         </button>
         <button
           type="button"
-          onClick={() => { setOpen(false); setText(''); }}
+          onClick={() => { setOpen(false); setText(''); setError(''); }}
           className="rounded-lg px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-100 transition"
         >
           İptal
