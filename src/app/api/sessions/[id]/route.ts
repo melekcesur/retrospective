@@ -33,7 +33,7 @@ export async function GET(
   };
 
   const cardsResult = await db.execute({
-    sql: `SELECT c.id, c.column_id, c.text, c.author_id, c.created_at, c.group_name,
+    sql: `SELECT c.*,
                  COUNT(v.user_id) as vote_count,
                  SUM(CASE WHEN v.user_id = ? THEN 1 ELSE 0 END) as has_voted
           FROM cards c
