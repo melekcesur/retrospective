@@ -46,6 +46,7 @@ export interface SessionRow {
   hostId: string;
   cardsHidden: boolean;
   votingOpen: boolean;
+  scoresHidden: boolean;
   timerDuration: number;
   timerStartedAt: number | null;
   timerRunning: boolean;
@@ -57,6 +58,7 @@ export interface CardRow {
   columnId: ColumnId;
   text: string;
   authorId: string;
+  groupName: string | null;
   voteCount: number;
   hasVoted: boolean;
   createdAt: number;

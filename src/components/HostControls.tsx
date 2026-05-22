@@ -17,34 +17,34 @@ const TIMER_PRESETS = [
   { label: '10 dk', value: 600 },
 ];
 
-export default function HostControls({
-  session,
-  hostId,
-  sessionId,
-  onRefresh,
-}: Props) {
+export default function HostControls({ session, hostId, sessionId, onRefresh }: Props) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   async function patch(updates: Record<string, unknown>) {
     setLoading(true);
+    setError('');
     try {
-      await fetch(`/api/sessions/${sessionId}/settings`, {
+      const res = await fetch(`/api/sessions/${sessionId}/settings`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ hostId, ...updates }),
       });
-      onRefresh();
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(body.error ?? `Hata ${res.status}`);
+        return;
+      }
+      await onRefresh();
+    } catch (err) {
+      setError(String(err));
     } finally {
       setLoading(false);
     }
   }
 
   async function startTimer(duration: number) {
-    await patch({
-      timerDuration: duration,
-      timerStartedAt: Date.now(),
-      timerRunning: true,
-    });
+    await patch({ timerDuration: duration, timerStartedAt: Date.now(), timerRunning: true });
   }
 
   async function stopTimer() {
@@ -56,6 +56,8 @@ export default function HostControls({
       <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-violet-500">
         <span>👑</span> Host Kontrolleri
       </p>
+
+      {error && <p className="mb-2 text-xs text-red-500">{error}</p>}
 
       <div className="flex flex-wrap gap-2">
         {/* Hide cards */}
@@ -84,6 +86,19 @@ export default function HostControls({
           {session.votingOpen ? '🔒 Oylamayı Kapat' : '🗳 Oylamayı Aç'}
         </button>
 
+        {/* Scores visibility */}
+        <button
+          disabled={loading}
+          onClick={() => patch({ scoresHidden: !session.scoresHidden })}
+          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+            session.scoresHidden
+              ? 'bg-amber-500 text-white'
+              : 'bg-white text-amber-600 ring-1 ring-amber-300 hover:bg-amber-50'
+          }`}
+        >
+          {session.scoresHidden ? '🔢 Oylar Gizli' : '🔢 Oyları Gizle'}
+        </button>
+
         {/* Timer */}
         {session.timerRunning ? (
           <button
@@ -94,18 +109,16 @@ export default function HostControls({
             ⏹ Durdur
           </button>
         ) : (
-          <>
-            {TIMER_PRESETS.map((p) => (
-              <button
-                key={p.value}
-                disabled={loading}
-                onClick={() => startTimer(p.value)}
-                className="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-slate-600 ring-1 ring-slate-300 hover:bg-slate-50 transition"
-              >
-                ▶ {p.label}
-              </button>
-            ))}
-          </>
+          TIMER_PRESETS.map((p) => (
+            <button
+              key={p.value}
+              disabled={loading}
+              onClick={() => startTimer(p.value)}
+              className="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-slate-600 ring-1 ring-slate-300 hover:bg-slate-50 transition"
+            >
+              ▶ {p.label}
+            </button>
+          ))
         )}
       </div>
     </div>

@@ -25,6 +25,7 @@ export async function GET(
     hostId: r.host_id as string,
     cardsHidden: Boolean(r.cards_hidden),
     votingOpen: Boolean(r.voting_open),
+    scoresHidden: Boolean(r.scores_hidden),
     timerDuration: r.timer_duration as number,
     timerStartedAt: r.timer_started_at as number | null,
     timerRunning: Boolean(r.timer_running),
@@ -32,7 +33,7 @@ export async function GET(
   };
 
   const cardsResult = await db.execute({
-    sql: `SELECT c.id, c.column_id, c.text, c.author_id, c.created_at,
+    sql: `SELECT c.id, c.column_id, c.text, c.author_id, c.created_at, c.group_name,
                  COUNT(v.user_id) as vote_count,
                  SUM(CASE WHEN v.user_id = ? THEN 1 ELSE 0 END) as has_voted
           FROM cards c
@@ -48,6 +49,7 @@ export async function GET(
     columnId: c.column_id as ColumnId,
     text: c.text as string,
     authorId: c.author_id as string,
+    groupName: (c.group_name as string | null) ?? null,
     voteCount: Number(c.vote_count),
     hasVoted: Boolean(c.has_voted),
     createdAt: c.created_at as number,

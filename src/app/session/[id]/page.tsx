@@ -15,7 +15,6 @@ export default function SessionPage() {
   const { data, loading, error, refresh } = useSession(id, userId);
   const [sortByVotes, setSortByVotes] = useState(false);
   const [copied, setCopied] = useState(false);
-
   const [isHost, setIsHost] = useState(false);
 
   useEffect(() => {
@@ -29,6 +28,31 @@ export default function SessionPage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
+  }
+
+  async function exportToExcel() {
+    if (!data) return;
+    const XLSX = await import('xlsx');
+    const wb = XLSX.utils.book_new();
+
+    for (const col of COLUMNS) {
+      const colCards = data.cards
+        .filter((c) => c.columnId === col.id)
+        .sort((a, b) => b.voteCount - a.voteCount);
+
+      const rows = colCards.map((c) => ({
+        Grup: c.groupName ?? '',
+        Metin: c.text,
+        'Oy Sayısı': c.voteCount,
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws['!cols'] = [{ wch: 20 }, { wch: 50 }, { wch: 10 }];
+      XLSX.utils.book_append_sheet(wb, ws, `${col.emoji} ${col.label}`);
+    }
+
+    const date = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `retro-${id}-${date}.xlsx`);
   }
 
   if (loading) {
@@ -63,14 +87,24 @@ export default function SessionPage() {
           )}
         </div>
 
-        <button
-          onClick={copyCode}
-          title="Kodu kopyala"
-          className="flex shrink-0 items-center gap-1.5 rounded-lg bg-slate-700 px-3 py-1.5 text-sm font-mono font-medium text-slate-200 hover:bg-slate-600 transition"
-        >
-          <span className="tracking-widest">{id}</span>
-          <span className="text-xs text-slate-400">{copied ? '✓' : '⎘'}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={copyCode}
+            title="Kodu kopyala"
+            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-slate-700 px-3 py-1.5 text-sm font-mono font-medium text-slate-200 hover:bg-slate-600 transition"
+          >
+            <span className="tracking-widest">{id}</span>
+            <span className="text-xs text-slate-400">{copied ? '✓' : '⎘'}</span>
+          </button>
+
+          <button
+            onClick={exportToExcel}
+            title="Excel'e aktar"
+            className="shrink-0 rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-600 transition"
+          >
+            ⬇ Excel
+          </button>
+        </div>
       </header>
 
       <div className="flex flex-col gap-4 p-4">
@@ -125,8 +159,10 @@ export default function SessionPage() {
               cards={cards.filter((c) => c.columnId === col.id)}
               sessionId={id}
               userId={userId}
+              isHost={isHost}
               cardsHidden={session.cardsHidden}
               votingOpen={session.votingOpen}
+              scoresHidden={session.scoresHidden}
               sortByVotes={sortByVotes}
               onRefresh={refresh}
             />

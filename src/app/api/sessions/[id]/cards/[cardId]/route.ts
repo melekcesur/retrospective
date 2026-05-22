@@ -32,3 +32,32 @@ export async function DELETE(
 
   return NextResponse.json({ ok: true });
 }
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string; cardId: string } },
+) {
+  try {
+    const { hostId, groupName } = await req.json();
+
+    const db = getDb();
+
+    const sessionResult = await db.execute({
+      sql: 'SELECT host_id FROM sessions WHERE id = ?',
+      args: [params.id],
+    });
+
+    if (!sessionResult.rows[0] || sessionResult.rows[0].host_id !== hostId) {
+      return NextResponse.json({ error: 'Yetkisiz' }, { status: 403 });
+    }
+
+    await db.execute({
+      sql: 'UPDATE cards SET group_name = ? WHERE id = ? AND session_id = ?',
+      args: [groupName || null, params.cardId, params.id],
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
+}
