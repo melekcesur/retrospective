@@ -2,6 +2,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import type { SessionRow, CardRow, ColumnId } from '@/types';
 
+const CARDS_SQL_WITH_GROUP = `
+  SELECT c.id, c.column_id, c.text, c.author_id, c.created_at, c.group_name,
+         COUNT(v.user_id) as vote_count,
+         SUM(CASE WHEN v.user_id = ? THEN 1 ELSE 0 END) as has_voted
+  FROM cards c
+  LEFT JOIN votes v ON v.card_id = c.id
+  WHERE c.session_id = ?
+  GROUP BY c.id
+  ORDER BY c.created_at ASC`;
+
+const CARDS_SQL_NO_GROUP = `
+  SELECT c.id, c.column_id, c.text, c.author_id, c.created_at,
+         COUNT(v.user_id) as vote_count,
+         SUM(CASE WHEN v.user_id = ? THEN 1 ELSE 0 END) as has_voted
+  FROM cards c
+  LEFT JOIN votes v ON v.card_id = c.id
+  WHERE c.session_id = ?
+  GROUP BY c.id
+  ORDER BY c.created_at ASC`;
+
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } },
@@ -32,24 +52,28 @@ export async function GET(
     createdAt: r.created_at as number,
   };
 
-  const cardsResult = await db.execute({
-    sql: `SELECT c.*,
-                 COUNT(v.user_id) as vote_count,
-                 SUM(CASE WHEN v.user_id = ? THEN 1 ELSE 0 END) as has_voted
-          FROM cards c
-          LEFT JOIN votes v ON v.card_id = c.id
-          WHERE c.session_id = ?
-          GROUP BY c.id
-          ORDER BY c.created_at ASC`,
-    args: [userId, params.id],
-  });
+  // Try with group_name; fall back if column doesn't exist yet
+  let cardsResult;
+  let hasGroupName = true;
+  try {
+    cardsResult = await db.execute({
+      sql: CARDS_SQL_WITH_GROUP,
+      args: [userId, params.id],
+    });
+  } catch {
+    hasGroupName = false;
+    cardsResult = await db.execute({
+      sql: CARDS_SQL_NO_GROUP,
+      args: [userId, params.id],
+    });
+  }
 
   const cards: CardRow[] = cardsResult.rows.map((c) => ({
     id: c.id as string,
     columnId: c.column_id as ColumnId,
     text: c.text as string,
     authorId: c.author_id as string,
-    groupName: (c.group_name as string | null) ?? null,
+    groupName: hasGroupName ? ((c.group_name as string | null) ?? null) : null,
     voteCount: Number(c.vote_count),
     hasVoted: Boolean(c.has_voted),
     createdAt: c.created_at as number,
