@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDbReady } from '@/lib/db';
 
 export async function DELETE(
   req: NextRequest,
@@ -8,7 +8,7 @@ export async function DELETE(
   const authorId = req.nextUrl.searchParams.get('authorId');
   if (!authorId) return NextResponse.json({ error: 'Yetkisiz' }, { status: 403 });
 
-  const db = getDb();
+  const db = await getDbReady();
   const result = await db.execute({
     sql: 'SELECT author_id FROM cards WHERE id = ? AND session_id = ?',
     args: [params.cardId, params.id],
@@ -32,7 +32,7 @@ export async function PATCH(
       groupName?: string | null;
       text?: string;
     };
-    const db = getDb();
+    const db = await getDbReady();
 
     // Text update — only the card's author
     if (body.text !== undefined) {
@@ -53,13 +53,14 @@ export async function PATCH(
       return NextResponse.json({ ok: true });
     }
 
-    // Group name update — only the host
-    if (body.groupName !== undefined || 'groupName' in body) {
+    // Group assignment — only the host
+    if ('groupName' in body) {
       const sessionResult = await db.execute({
         sql: 'SELECT host_id FROM sessions WHERE id = ?',
         args: [params.id],
       });
       if (!sessionResult.rows[0] || sessionResult.rows[0].host_id !== body.hostId) {
+        console.error('[cards PATCH] auth mismatch — db:', sessionResult.rows[0]?.host_id, 'sent:', body.hostId);
         return NextResponse.json({ error: 'Yetkisiz' }, { status: 403 });
       }
 
@@ -72,6 +73,7 @@ export async function PATCH(
 
     return NextResponse.json({ error: 'Geçersiz istek' }, { status: 400 });
   } catch (err) {
+    console.error('[cards PATCH]', err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }

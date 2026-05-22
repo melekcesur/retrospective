@@ -28,41 +28,40 @@ export default function Column({
     sortByVotes ? b.voteCount - a.voteCount : a.createdAt - b.createdAt,
   );
 
+  async function patchCard(cardId: string, body: Record<string, unknown>) {
+    const res = await fetch(`/api/sessions/${sessionId}/cards/${cardId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      console.error('[Column] card PATCH failed', res.status, data);
+    }
+  }
+
   async function handleMerge(draggedCardId: string, targetCardId: string) {
     setDragOverId(null);
     const draggedCard = cards.find((c) => c.id === draggedCardId);
     const targetCard = cards.find((c) => c.id === targetCardId);
     if (!draggedCard || !targetCard) return;
 
-    let groupName = targetCard.groupName;
-    if (!groupName) {
-      groupName = `G-${Date.now().toString(36).slice(-4).toUpperCase()}`;
-      await fetch(`/api/sessions/${sessionId}/cards/${targetCardId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hostId: userId, groupName }),
-      });
+    // Use existing group or create a new one
+    const groupName = targetCard.groupName ?? `G${Date.now().toString(36).slice(-5).toUpperCase()}`;
+
+    if (!targetCard.groupName) {
+      await patchCard(targetCardId, { hostId: userId, groupName });
     }
-
-    await fetch(`/api/sessions/${sessionId}/cards/${draggedCardId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ hostId: userId, groupName }),
-    });
-
+    await patchCard(draggedCardId, { hostId: userId, groupName });
     onRefresh();
   }
 
   async function handleUnmerge(cardId: string) {
-    await fetch(`/api/sessions/${sessionId}/cards/${cardId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ hostId: userId, groupName: null }),
-    });
+    await patchCard(cardId, { hostId: userId, groupName: null });
     onRefresh();
   }
 
-  // Build group map
+  // Build group map preserving sort order
   const groupMap = new Map<string, CardRow[]>();
   const ungrouped: CardRow[] = [];
 
@@ -120,15 +119,15 @@ export default function Column({
 
         {isHost && groups.length === 0 && ungrouped.length > 1 && (
           <p className="text-center text-xs text-slate-400">
-            Kartları birleştirmek için sürükle & bırak
+            Kartları birleştirmek için sürükle &amp; bırak
           </p>
         )}
 
         {/* Grouped cards */}
         {groups.map((group) => (
           <div key={group.name} className="rounded-lg border border-slate-200 bg-white/60 p-2">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-600">🔗 {group.name}</span>
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">🔗 Grup</span>
               {!scoresHidden && group.totalVotes > 0 && (
                 <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-600">
                   {group.totalVotes} oy

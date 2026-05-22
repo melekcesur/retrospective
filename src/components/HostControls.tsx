@@ -22,26 +22,25 @@ export default function HostControls({ session, hostId, sessionId, onRefresh }: 
   const [error, setError] = useState('');
 
   async function patch(updates: Record<string, unknown>) {
+    if (!hostId) {
+      setError('Kimlik bulunamadı, sayfayı yenileyin.');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
-      const payload = { hostId, ...updates };
-      console.log('[HostControls] PATCH', sessionId, payload);
       const res = await fetch(`/api/sessions/${sessionId}/settings`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ hostId, ...updates }),
       });
+      const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        const msg = body.error ?? `Hata ${res.status}`;
-        console.error('[HostControls] PATCH failed', res.status, body);
-        setError(msg);
+        setError(body.error ?? `Hata ${res.status}`);
         return;
       }
       await onRefresh();
     } catch (err) {
-      console.error('[HostControls] PATCH error', err);
       setError(String(err));
     } finally {
       setLoading(false);
@@ -63,9 +62,8 @@ export default function HostControls({ session, hostId, sessionId, onRefresh }: 
       </p>
 
       {error && (
-        <div className="mb-3 flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 ring-1 ring-red-200">
-          <span className="text-red-500">⚠️</span>
-          <p className="text-xs text-red-600">{error}</p>
+        <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 ring-1 ring-red-200">
+          <p className="text-xs font-medium text-red-600">⚠️ {error}</p>
         </div>
       )}
 
@@ -74,7 +72,7 @@ export default function HostControls({ session, hostId, sessionId, onRefresh }: 
         <button
           disabled={loading}
           onClick={() => patch({ cardsHidden: !session.cardsHidden })}
-          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:opacity-60 ${
             session.cardsHidden
               ? 'bg-violet-600 text-white'
               : 'bg-white text-violet-700 ring-1 ring-violet-300 hover:bg-violet-50'
@@ -87,7 +85,7 @@ export default function HostControls({ session, hostId, sessionId, onRefresh }: 
         <button
           disabled={loading}
           onClick={() => patch({ votingOpen: !session.votingOpen })}
-          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:opacity-60 ${
             session.votingOpen
               ? 'bg-indigo-600 text-white'
               : 'bg-white text-indigo-700 ring-1 ring-indigo-300 hover:bg-indigo-50'
@@ -96,11 +94,11 @@ export default function HostControls({ session, hostId, sessionId, onRefresh }: 
           {session.votingOpen ? '🔒 Oylamayı Kapat' : '🗳 Oylamayı Aç'}
         </button>
 
-        {/* Scores visibility */}
+        {/* Scores */}
         <button
           disabled={loading}
           onClick={() => patch({ scoresHidden: !session.scoresHidden })}
-          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:opacity-60 ${
             session.scoresHidden
               ? 'bg-amber-500 text-white'
               : 'bg-white text-amber-600 ring-1 ring-amber-300 hover:bg-amber-50'
@@ -114,7 +112,7 @@ export default function HostControls({ session, hostId, sessionId, onRefresh }: 
           <button
             disabled={loading}
             onClick={stopTimer}
-            className="rounded-lg bg-red-100 px-3 py-1.5 text-sm font-medium text-red-700 ring-1 ring-red-300 hover:bg-red-200 transition"
+            className="rounded-lg bg-red-100 px-3 py-1.5 text-sm font-medium text-red-700 ring-1 ring-red-300 hover:bg-red-200 transition disabled:opacity-60"
           >
             ⏹ Durdur
           </button>
@@ -124,7 +122,7 @@ export default function HostControls({ session, hostId, sessionId, onRefresh }: 
               key={p.value}
               disabled={loading}
               onClick={() => startTimer(p.value)}
-              className="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-slate-600 ring-1 ring-slate-300 hover:bg-slate-50 transition"
+              className="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-slate-600 ring-1 ring-slate-300 hover:bg-slate-50 transition disabled:opacity-60"
             >
               ▶ {p.label}
             </button>

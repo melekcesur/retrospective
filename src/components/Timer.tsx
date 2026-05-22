@@ -9,11 +9,11 @@ interface Props {
 }
 
 export default function Timer({ session }: Props) {
-  const { timerRunning, timerStartedAt, timerDuration } = session;
+  const { timerStartedAt, timerDuration } = session;
   const [remaining, setRemaining] = useState(timerDuration);
 
   useEffect(() => {
-    if (!timerRunning || !timerStartedAt) {
+    if (!timerStartedAt) {
       setRemaining(timerDuration);
       return;
     }
@@ -26,26 +26,25 @@ export default function Timer({ session }: Props) {
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [timerRunning, timerStartedAt, timerDuration]);
-
-  if (!timerRunning && !timerStartedAt) return null;
+  }, [timerStartedAt, timerDuration]);
 
   const pct = timerDuration > 0 ? remaining / timerDuration : 1;
   const color =
-    pct > 0.5
-      ? 'text-emerald-600'
-      : pct > 0.2
-        ? 'text-amber-500'
-        : 'text-red-500';
+    pct > 0.5 ? 'text-emerald-600' : pct > 0.2 ? 'text-amber-500' : 'text-red-500';
+
+  if (remaining === 0) {
+    return (
+      <div className="flex items-center justify-center gap-2">
+        <span className="animate-bounce text-2xl">⏰</span>
+        <span className="font-mono text-3xl font-bold text-red-500 tabular-nums">00:00</span>
+        <span className="text-lg font-medium text-red-500">Süre doldu!</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex items-center justify-center gap-2">
-      <span className={`font-mono text-3xl font-bold tabular-nums ${color}`}>
-        {formatTime(remaining)}
-      </span>
-      {remaining === 0 && (
-        <span className="animate-bounce text-lg">⏰ Süre doldu!</span>
-      )}
-    </div>
+    <span className={`font-mono text-3xl font-bold tabular-nums ${color}`}>
+      {formatTime(remaining)}
+    </span>
   );
 }

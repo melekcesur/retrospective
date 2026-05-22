@@ -1,58 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { InValue } from '@libsql/client';
-import { getDb } from '@/lib/db';
+import { getDbReady } from '@/lib/db';
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
   try {
-    const body = await req.json();
-    const { hostId, ...updates } = body as Record<string, unknown>;
+    const body = await req.json() as Record<string, unknown>;
+    const hostId = body.hostId as string | undefined;
 
-    const db = getDb();
+    if (!hostId) {
+      return NextResponse.json({ error: 'hostId eksik' }, { status: 400 });
+    }
+
+    const db = await getDbReady();
 
     const sessionResult = await db.execute({
       sql: 'SELECT host_id FROM sessions WHERE id = ?',
       args: [params.id],
     });
 
-    if (sessionResult.rows.length === 0) {
+    if (!sessionResult.rows[0]) {
       return NextResponse.json({ error: 'Oturum bulunamadı' }, { status: 404 });
     }
 
-    if (sessionResult.rows[0].host_id !== hostId) {
-      console.error('[settings PATCH] auth fail — db host_id:', sessionResult.rows[0].host_id, 'sent hostId:', hostId);
-      return NextResponse.json({ error: `Yetkisiz (host eşleşmiyor)` }, { status: 403 });
+    const dbHostId = sessionResult.rows[0].host_id as string;
+    if (dbHostId !== hostId) {
+      console.error('[settings PATCH] auth mismatch — db:', dbHostId, 'sent:', hostId);
+      return NextResponse.json({ error: 'Yetkisiz' }, { status: 403 });
     }
 
-    const allowed = [
-      'cards_hidden',
-      'voting_open',
-      'scores_hidden',
-      'timer_duration',
-      'timer_started_at',
-      'timer_running',
-    ];
-    const setClauses: string[] = [];
-    const args: InValue[] = [];
+    const updates: Array<{ col: string; val: InValue }> = [];
 
-    for (const [key, val] of Object.entries(updates)) {
-      const col = key.replace(/([A-Z])/g, '_$1').toLowerCase();
-      if (allowed.includes(col)) {
-        setClauses.push(`${col} = ?`);
-        args.push(val === true ? 1 : val === false ? 0 : (val as InValue));
-      }
-    }
+    if ('cardsHidden' in body)
+      updates.push({ col: 'cards_hidden', val: body.cardsHidden ? 1 : 0 });
+    if ('votingOpen' in body)
+      updates.push({ col: 'voting_open', val: body.votingOpen ? 1 : 0 });
+    if ('scoresHidden' in body)
+      updates.push({ col: 'scores_hidden', val: body.scoresHidden ? 1 : 0 });
+    if ('timerDuration' in body)
+      updates.push({ col: 'timer_duration', val: body.timerDuration as InValue });
+    if ('timerRunning' in body)
+      updates.push({ col: 'timer_running', val: body.timerRunning ? 1 : 0 });
+    if ('timerStartedAt' in body)
+      updates.push({ col: 'timer_started_at', val: body.timerStartedAt as InValue ?? null });
 
-    if (setClauses.length === 0) {
-      return NextResponse.json({ ok: true });
-    }
+    if (updates.length === 0) return NextResponse.json({ ok: true });
 
-    args.push(params.id);
     await db.execute({
-      sql: `UPDATE sessions SET ${setClauses.join(', ')} WHERE id = ?`,
-      args,
+      sql: `UPDATE sessions SET ${updates.map((u) => `${u.col} = ?`).join(', ')} WHERE id = ?`,
+      args: [...updates.map((u) => u.val), params.id],
     });
 
     return NextResponse.json({ ok: true });

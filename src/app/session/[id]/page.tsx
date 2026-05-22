@@ -129,8 +129,8 @@ export default function SessionPage() {
       </header>
 
       <div className="flex flex-col gap-4 p-4">
-        {/* Timer */}
-        {(session.timerRunning || session.timerStartedAt !== null) && (
+        {/* Timer — only visible while actively running */}
+        {session.timerRunning && (
           <div className="rounded-xl bg-white py-4 text-center shadow-sm ring-1 ring-slate-200">
             <Timer session={session} />
           </div>
