@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import type { Column as ColumnType, CardRow } from '@/types';
 import CardItem from './CardItem';
 import AddCard from './AddCard';
@@ -17,21 +18,51 @@ interface Props {
   onRefresh: () => void;
 }
 
-interface Group {
-  name: string | null;
-  cards: CardRow[];
-  totalVotes: number;
-}
-
 export default function Column({
   column, cards, sessionId, userId, isHost,
   cardsHidden, votingOpen, scoresHidden, sortByVotes, onRefresh,
 }: Props) {
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+
   const sorted = [...cards].sort((a, b) =>
     sortByVotes ? b.voteCount - a.voteCount : a.createdAt - b.createdAt,
   );
 
-  // Separate grouped and ungrouped
+  async function handleMerge(draggedCardId: string, targetCardId: string) {
+    setDragOverId(null);
+    const draggedCard = cards.find((c) => c.id === draggedCardId);
+    const targetCard = cards.find((c) => c.id === targetCardId);
+    if (!draggedCard || !targetCard) return;
+
+    let groupName = targetCard.groupName;
+    if (!groupName) {
+      groupName = `G-${Date.now().toString(36).slice(-4).toUpperCase()}`;
+      await fetch(`/api/sessions/${sessionId}/cards/${targetCardId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hostId: userId, groupName }),
+      });
+    }
+
+    await fetch(`/api/sessions/${sessionId}/cards/${draggedCardId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hostId: userId, groupName }),
+    });
+
+    onRefresh();
+  }
+
+  async function handleUnmerge(cardId: string) {
+    await fetch(`/api/sessions/${sessionId}/cards/${cardId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hostId: userId, groupName: null }),
+    });
+    onRefresh();
+  }
+
+  // Build group map
   const groupMap = new Map<string, CardRow[]>();
   const ungrouped: CardRow[] = [];
 
@@ -44,20 +75,36 @@ export default function Column({
     }
   }
 
-  const groups: Group[] = Array.from(groupMap.entries()).map(([name, groupCards]) => ({
+  const groups = Array.from(groupMap.entries()).map(([name, groupCards]) => ({
     name,
     cards: groupCards,
     totalVotes: groupCards.reduce((s, c) => s + c.voteCount, 0),
   }));
 
-  if (sortByVotes) {
-    groups.sort((a, b) => b.totalVotes - a.totalVotes);
-  }
+  if (sortByVotes) groups.sort((a, b) => b.totalVotes - a.totalVotes);
 
-  const cardProps = { sessionId, userId, isHost, isHidden: cardsHidden, votingOpen, scoresHidden, onRefresh };
+  const cardProps = (card: CardRow) => ({
+    card,
+    sessionId,
+    userId,
+    isHost,
+    isHidden: cardsHidden,
+    votingOpen,
+    scoresHidden,
+    isDragOver: dragOverId === card.id,
+    onDragStart: () => {},
+    onDragOver: () => setDragOverId(card.id),
+    onDragLeave: () => setDragOverId(null),
+    onDrop: (draggedId: string) => handleMerge(draggedId, card.id),
+    onUnmerge: () => handleUnmerge(card.id),
+    onRefresh,
+  });
 
   return (
-    <div className={`flex min-w-0 flex-1 flex-col rounded-xl border ${column.border} ${column.bg}`}>
+    <div
+      className={`flex min-w-0 flex-1 flex-col rounded-xl border ${column.border} ${column.bg}`}
+      onDragEnd={() => setDragOverId(null)}
+    >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-inherit px-4 py-3">
         <h2 className={`font-semibold ${column.accent}`}>
@@ -70,6 +117,12 @@ export default function Column({
 
       <div className="flex flex-col gap-2 p-3">
         <AddCard sessionId={sessionId} columnId={column.id} userId={userId} onRefresh={onRefresh} />
+
+        {isHost && groups.length === 0 && ungrouped.length > 1 && (
+          <p className="text-center text-xs text-slate-400">
+            Kartları birleştirmek için sürükle & bırak
+          </p>
+        )}
 
         {/* Grouped cards */}
         {groups.map((group) => (
@@ -84,7 +137,7 @@ export default function Column({
             </div>
             <div className="flex flex-col gap-1.5">
               {group.cards.map((card) => (
-                <CardItem key={card.id} card={card} {...cardProps} />
+                <CardItem key={card.id} {...cardProps(card)} />
               ))}
             </div>
           </div>
@@ -92,7 +145,7 @@ export default function Column({
 
         {/* Ungrouped cards */}
         {ungrouped.map((card) => (
-          <CardItem key={card.id} card={card} {...cardProps} />
+          <CardItem key={card.id} {...cardProps(card)} />
         ))}
       </div>
     </div>

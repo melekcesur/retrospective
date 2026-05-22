@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useUserId } from '@/hooks/useUserId';
 import { useSession } from '@/hooks/useSession';
-import { COLUMNS } from '@/types';
+import { COLUMNS, type CardRow } from '@/types';
 import Column from '@/components/Column';
 import HostControls from '@/components/HostControls';
 import Timer from '@/components/Timer';
@@ -35,19 +35,40 @@ export default function SessionPage() {
     const XLSX = await import('xlsx');
     const wb = XLSX.utils.book_new();
 
-    for (const col of COLUMNS) {
-      const colCards = data.cards
-        .filter((c) => c.columnId === col.id)
-        .sort((a, b) => b.voteCount - a.voteCount);
+    type ExcelRow = { Grup: string; Metin: string; 'Oy Sayısı': number };
 
-      const rows = colCards.map((c) => ({
-        Grup: c.groupName ?? '',
-        Metin: c.text,
-        'Oy Sayısı': c.voteCount,
-      }));
+    for (const col of COLUMNS) {
+      const colCards: CardRow[] = data.cards.filter((c) => c.columnId === col.id);
+      const groupMap: Record<string, CardRow[]> = {};
+      const ungrouped: CardRow[] = [];
+
+      for (const card of colCards) {
+        if (card.groupName) {
+          groupMap[card.groupName] = [...(groupMap[card.groupName] ?? []), card];
+        } else {
+          ungrouped.push(card);
+        }
+      }
+
+      const rows: ExcelRow[] = [];
+
+      for (const [groupName, groupCards] of Object.entries(groupMap)) {
+        const sorted = [...groupCards].sort((a, b) => b.voteCount - a.voteCount);
+        rows.push({
+          Grup: groupName,
+          Metin: sorted.map((c) => c.text).join('\n----\n'),
+          'Oy Sayısı': sorted.reduce((s, c) => s + c.voteCount, 0),
+        });
+      }
+
+      for (const card of ungrouped) {
+        rows.push({ Grup: '', Metin: card.text, 'Oy Sayısı': card.voteCount });
+      }
+
+      rows.sort((a, b) => b['Oy Sayısı'] - a['Oy Sayısı']);
 
       const ws = XLSX.utils.json_to_sheet(rows);
-      ws['!cols'] = [{ wch: 20 }, { wch: 50 }, { wch: 10 }];
+      ws['!cols'] = [{ wch: 20 }, { wch: 60 }, { wch: 10 }];
       XLSX.utils.book_append_sheet(wb, ws, `${col.emoji} ${col.label}`);
     }
 
