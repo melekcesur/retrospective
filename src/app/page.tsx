@@ -32,6 +32,10 @@ export default function Home() {
         return;
       }
       const data = await res.json();
+      if (!data.id) {
+        setCreateError(`Geçersiz yanıt: ${JSON.stringify(data)}`);
+        return;
+      }
       localStorage.setItem(`retro_host_${data.id}`, userId);
       router.push(`/session/${data.id}`);
     } catch (err) {
