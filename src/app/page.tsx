@@ -12,21 +12,30 @@ export default function Home() {
   const [code, setCode] = useState('');
   const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [createError, setCreateError] = useState('');
   const [joinError, setJoinError] = useState('');
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim() || !userId) return;
     setCreating(true);
+    setCreateError('');
     try {
       const res = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: title.trim(), hostId: userId }),
       });
+      if (!res.ok) {
+        const body = await res.text();
+        setCreateError(`Hata (${res.status}): ${body}`);
+        return;
+      }
       const data = await res.json();
       localStorage.setItem(`retro_host_${data.id}`, userId);
       router.push(`/session/${data.id}`);
+    } catch (err) {
+      setCreateError(`Bağlantı hatası: ${String(err)}`);
     } finally {
       setCreating(false);
     }
@@ -75,6 +84,9 @@ export default function Home() {
             placeholder="Örn: Sprint 12 Retrosu"
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm placeholder-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
           />
+          {createError && (
+            <p className="mt-1.5 text-xs text-red-500 break-all">{createError}</p>
+          )}
           <button
             type="submit"
             disabled={creating || !title.trim()}
