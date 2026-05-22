@@ -10,6 +10,7 @@ async function main() {
     host_id TEXT NOT NULL,
     cards_hidden INTEGER NOT NULL DEFAULT 0,
     voting_open INTEGER NOT NULL DEFAULT 0,
+    scores_hidden INTEGER NOT NULL DEFAULT 0,
     timer_duration INTEGER NOT NULL DEFAULT 300,
     timer_started_at INTEGER,
     timer_running INTEGER NOT NULL DEFAULT 0,
@@ -22,6 +23,7 @@ async function main() {
     column_id TEXT NOT NULL,
     text TEXT NOT NULL,
     author_id TEXT NOT NULL,
+    group_name TEXT,
     created_at INTEGER NOT NULL
   );
 

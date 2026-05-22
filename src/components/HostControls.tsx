@@ -25,18 +25,23 @@ export default function HostControls({ session, hostId, sessionId, onRefresh }: 
     setLoading(true);
     setError('');
     try {
+      const payload = { hostId, ...updates };
+      console.log('[HostControls] PATCH', sessionId, payload);
       const res = await fetch(`/api/sessions/${sessionId}/settings`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hostId, ...updates }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setError(body.error ?? `Hata ${res.status}`);
+        const msg = body.error ?? `Hata ${res.status}`;
+        console.error('[HostControls] PATCH failed', res.status, body);
+        setError(msg);
         return;
       }
       await onRefresh();
     } catch (err) {
+      console.error('[HostControls] PATCH error', err);
       setError(String(err));
     } finally {
       setLoading(false);
@@ -57,7 +62,12 @@ export default function HostControls({ session, hostId, sessionId, onRefresh }: 
         <span>👑</span> Host Kontrolleri
       </p>
 
-      {error && <p className="mb-2 text-xs text-red-500">{error}</p>}
+      {error && (
+        <div className="mb-3 flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 ring-1 ring-red-200">
+          <span className="text-red-500">⚠️</span>
+          <p className="text-xs text-red-600">{error}</p>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {/* Hide cards */}

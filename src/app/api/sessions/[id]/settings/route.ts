@@ -22,7 +22,8 @@ export async function PATCH(
     }
 
     if (sessionResult.rows[0].host_id !== hostId) {
-      return NextResponse.json({ error: 'Yetkisiz' }, { status: 403 });
+      console.error('[settings PATCH] auth fail — db host_id:', sessionResult.rows[0].host_id, 'sent hostId:', hostId);
+      return NextResponse.json({ error: `Yetkisiz (host eşleşmiyor)` }, { status: 403 });
     }
 
     const allowed = [
@@ -56,6 +57,7 @@ export async function PATCH(
 
     return NextResponse.json({ ok: true });
   } catch (err) {
+    console.error('[settings PATCH]', err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
